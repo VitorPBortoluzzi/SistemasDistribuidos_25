@@ -1,0 +1,11 @@
+/SistemasDist/nbproject/private/
+/SistemasDist/build/
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+*.user
+*.vs/
+.vscode/
+TestResults/
