@@ -10,3 +10,5 @@ obj/
 .vscode/
 TestResults/
 *.sln
+/Jogo1/nbproject/private/
+/Jogo1/build/
