@@ -6,10 +6,6 @@
 //     ordenarBolha(lista2);
 //     ordenarPente(lista1);
 
-
-using System;
-using System.Threading;
-
 class Program {
     static List<int> lista1 = new List<int>();
     static List<int> lista2 = new List<int>();
