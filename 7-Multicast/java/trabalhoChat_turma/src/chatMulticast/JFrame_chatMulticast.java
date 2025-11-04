@@ -187,7 +187,8 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
 
                     //endereço dos Remetentes
                     InetAddress senderAddress = (pacote.getAddress());
-                    String nickComIP = jTextField_Nick.getText() + " (" + senderAddress.getHostAddress() + ")";
+                    String nomeUsuario = msgRecebida.split(" ")[0];  // Pega a primeira palavra antes do "entrou"
+                    String nickComIP = nomeUsuario + " (" + senderAddress.getHostAddress() + ")";
                     if (!enderecos.contains(nickComIP)) {
                         enderecos.add(nickComIP); // Adiciona o IP à lista
                         updateJList();
