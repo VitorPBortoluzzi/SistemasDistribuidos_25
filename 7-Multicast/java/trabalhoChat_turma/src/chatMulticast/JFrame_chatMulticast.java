@@ -9,8 +9,10 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
 import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
@@ -127,16 +129,16 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
                 .addComponent(jButton_Enviar))
             .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.TRAILING)
             .addGroup(jPanel_ChatLayout.createSequentialGroup()
-                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 170, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 257, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
         );
         jPanel_ChatLayout.setVerticalGroup(
             jPanel_ChatLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel_ChatLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 198, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 54, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 138, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel_ChatLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jButton_Enviar)
@@ -188,11 +190,24 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
                     //endereço dos Remetentes
                     InetAddress senderAddress = (pacote.getAddress());
                     String nomeUsuario = msgRecebida.split(" ")[0];  // Pega a primeira palavra antes do "entrou"
-                    String nickComIP = nomeUsuario + " (" + senderAddress.getHostAddress() + ")";
-                    if (!enderecos.contains(nickComIP)) {
-                        enderecos.add(nickComIP); // Adiciona o IP à lista
-                        updateJList();
+                    
+                    
+                    if (msgRecebida.contains("saiu da sala")) {
+                    // Remove o usuário do HashMap
+                        if (usuarios.containsKey(nomeUsuario)) {
+                            usuarios.remove(nomeUsuario);  // Remove o usuário do HashMap
+                        }
+                    } else {
+                        // Caso não seja uma mensagem de saída, adiciona ou atualiza o usuário no HashMap
+                        if (!usuarios.containsKey(nomeUsuario)){
+                            usuarios.put(nomeUsuario, senderAddress);
+                        }
                     }
+                    
+
+                    // Atualiza a JList de usuários
+                    updateJList();
+                    
                     lista.add(msgRecebida);
                     Iterator i = lista.iterator();
                     jTextArea_Mensagens.setText("");
@@ -207,7 +222,7 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
     }
     
         // Lista para armazenar endereços IP dos usuários conectados
-    LinkedList<String> enderecos = new LinkedList<>();
+    HashMap<String, InetAddress> usuarios = new HashMap<>();
 
     // Método que atualiza a lista no JList
     private void updateJList() {
@@ -216,9 +231,9 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
         // Adiciona "Todos" para enviar para todos
         model.addElement("Todos");
 
-        // Adiciona os endereços IP dos conectados
-        for (String nickComIP : enderecos) {
-            model.addElement(nickComIP);
+        // Adiciona os nomes dos usuários com seus IPs
+        for (Map.Entry<String, InetAddress> entry : usuarios.entrySet()) {
+            model.addElement(entry.getKey() + " (" + entry.getValue().getHostAddress() + ")");
         }
 
         // Atualiza o JList
@@ -236,14 +251,17 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
      */
     private void sairDoSistema() throws IOException, NumberFormatException, NullPointerException {
         try {
-            String msg = jTextField_Nick.getText() + " saiu da sala";
+            String nomeUsuario = jTextField_Nick.getText();
+            String msg = nomeUsuario + " saiu da sala";
             DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
             socket.send(pacote);
             
-            // Remove o IP da lista de conectados
-            enderecos.remove(grupo);  // grupo aqui é o endereço do usuário (você pode usar seu próprio IP)
+            // Remove o usuário do HashMap usando o nome do usuário como chave
+            if (usuarios.containsKey(nomeUsuario)) {
+                usuarios.remove(nomeUsuario);  // Remove o usuário do HashMap
+            }
 
-            // Atualiza a JList
+            // Atualiza a JList com os usuários restantes
             updateJList();
 
         } catch (IOException | NumberFormatException | NullPointerException e) {
@@ -310,11 +328,21 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
         try {
             String msg = jTextField_Nick.getText() + ": " + jTextField_textoDeEnvio.getText();
             
-            //DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
-            //socket.send(pacote);
-            
             // Verifica se há um destinatário selecionado na lista
             String destinatarioSelecionado = jList1.getSelectedValue();
+            if (destinatarioSelecionado != null && !destinatarioSelecionado.equals("Todos")) {
+            // Extraímos o IP do destinatário, que vem no formato: Nome (IP)
+            String ipDestinatarioString = destinatarioSelecionado.replaceAll(".*\\((.*)\\).*", "$1");  // Regex para pegar o IP entre parênteses
+            
+            InetAddress ipDestinatario = InetAddress.getByName(ipDestinatarioString);  // Converte o IP extraído para InetAddress
+            DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, ipDestinatario.getHostAddress(), Integer.parseInt(jTextField_Porta.getText()));
+            socket.send(pacote);  // Envia a mensagem para o destinatário específico
+            } else {
+                // Caso o destinatário seja "Todos", envia para o grupo
+                DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
+                socket.send(pacote);  // Envia a mensagem para todos
+            }
+            /*
             if (destinatarioSelecionado != null && !destinatarioSelecionado.equals("Todos")) {
                 // Envia para um destinatário específico
                 InetAddress ipDestinatario = InetAddress.getByName(destinatarioSelecionado);
@@ -325,6 +353,7 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
                 DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
                 socket.send(pacote);
             }
+            */
             jTextField_textoDeEnvio.setText("");
         } catch (IOException | NumberFormatException | NullPointerException e) {
             if (e.getClass().toString().equals("class java.lang.NullPointerException")) {
