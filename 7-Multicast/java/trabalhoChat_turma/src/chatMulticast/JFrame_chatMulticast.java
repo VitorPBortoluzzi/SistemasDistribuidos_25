@@ -16,6 +16,7 @@ import java.util.Map;
 import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import util.ComunicadorUDP;
 
 /**
@@ -176,9 +177,11 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     /**
-     * classe interna que garante que o processo de ler/ouvir mensagens seja executado concomitantemente
+     * classe interna que garante que o processo de ler/ouvir mensagens seja
+     * executado concomitantemente
      */
     class ThreadReceptora extends Thread {
+
         @Override
         public void run() {
             JFrame meuFrame = JFrame_chatMulticast.this;
@@ -190,18 +193,18 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
                     //endereço dos Remetentes
                     InetAddress senderAddress = (pacote.getAddress());
                     String nomeUsuario = msgRecebida.split(" ")[0];  // Pega a primeira palavra antes do "entrou"
-                    if (nomeUsuario.contains(":"));nomeUsuario = nomeUsuario.replace(":", "");
+                    if (nomeUsuario.contains(":"));
+                    nomeUsuario = nomeUsuario.replace(":", "");
                     if (msgRecebida.endsWith("saiu da sala")) {
                         removeJlist(nomeUsuario);
-                        }
-                    
+                    }
+
                     // Adiciona o usuário ao HashMap se ele ainda não estiver lá
                     if (!usuarios.containsKey(nomeUsuario)) {
                         usuarios.put(nomeUsuario, senderAddress);
                         updateJList();  // Atualiza a lista de usuários na interface
                     }
-                    
-                    
+
                     lista.add(msgRecebida);
                     Iterator i = lista.iterator();
                     jTextArea_Mensagens.setText("");
@@ -214,8 +217,8 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
             }
         }
     }
-    
-        // Lista para armazenar endereços IP dos usuários conectados
+
+    // Lista para armazenar endereços IP dos usuários conectados
     HashMap<String, InetAddress> usuarios = new HashMap<>();
 
     // Método que atualiza a lista no JList
@@ -230,45 +233,50 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
             model.addElement(entry.getKey() + " (" + entry.getValue().getHostAddress() + ")");
         }
 
-        // Atualiza o JList
+        // Atualiza a JList
         jList1.setModel(model);
     }
-    
-    private void removeJlist(String nomeUsuario){
+
+    private void removeJlist(String nomeUsuario) {
         DefaultListModel<String> model = (DefaultListModel<String>) jList1.getModel();
-    
-    // Remove o usuário do HashMap
-    if (usuarios.containsKey(nomeUsuario)) {
-        usuarios.remove(nomeUsuario);  // Remove o usuário do HashMap
-    }
 
-    // Remove o usuário da JList
-    for (int i = 0; i < model.getSize(); i++) {
-        if (model.getElementAt(i).startsWith(nomeUsuario)) {
-            model.removeElementAt(i);  // Remove o item da JList que contém o nome do usuário
-            break;  // Não é necessário continuar buscando após encontrar o usuário
+        // Remove o usuário do HashMap
+        if (usuarios.containsKey(nomeUsuario)) {
+            usuarios.remove(nomeUsuario);  // Remove o usuário do HashMap
         }
-    }
 
-    // Atualiza a JList
-    jList1.setModel(model);
-}
+        // Remove o usuário da JList
+        for (int i = 0; i < model.getSize(); i++) {
+            if (model.getElementAt(i).startsWith(nomeUsuario)) {
+                model.removeElementAt(i);  // Remove o item da JList que contém o nome do usuário
+                break;  // Não é necessário continuar buscando após encontrar o usuário
+            }
+        }
+
+        // Atualiza a JList
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                updateJList();
+            }
+        });
+    }
 
     /**
-     * método privado que avisa que um computador saiu do grupo e encerra a conexão
+     * método privado que avisa que um computador saiu do grupo e encerra a
+     * conexão
+     *
      * @throws IOException
      * @throws NumberFormatException
-     * @throws NullPointerException 
+     * @throws NullPointerException
      */
     private void sairDoSistema() throws IOException, NumberFormatException, NullPointerException {
         try {
 
             String nomeUsuario = jTextField_Nick.getText();
             String msg = nomeUsuario + " saiu da sala";
-            DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText())); 
+            DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
             socket.send(pacote);
-            
-
 
         } catch (IOException | NumberFormatException | NullPointerException e) {
             if (e.getClass().toString().equals("class java.lang.NullPointerException")) {
@@ -283,8 +291,9 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
 
     /**
      * método privado que realiza a conexão do computador em um grupo multicast,
-     * tendo como referência endereço virtual do grupo e a porta do socket. O processo de escuta/leitura
-     * é circundado por thread de leitura
+     * tendo como referência endereço virtual do grupo e a porta do socket. O
+     * processo de escuta/leitura é circundado por thread de leitura
+     *
      * @param evt contém o evento recebido pelo tratador
      */
     private void jButton_ConectarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton_ConectarActionPerformed
@@ -296,17 +305,17 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
             } else {
                 //DEFINO O IP DO GRUPO
                 grupo = InetAddress.getByName(jTextField_GrupoIP.getText());
-                
+
                 //CRIO O SOCKET MULTICAST COM A PORTA ESPECIFICADA
                 socket = new MulticastSocket(Integer.parseInt(jTextField_Porta.getText()));
-                
+
                 //ENTRA NO GRUPO MULTICAST PARA RECEBER AS MENSAGENS
                 socket.joinGroup(grupo);
-                
+
                 //CRIO A THREAD PARA RECEBER AS MENSAGENS
                 ThreadReceptora tR = new ThreadReceptora();
                 tR.start();
-                
+
                 JOptionPane.showMessageDialog(this, "Conectado com sucesso!");
                 jButton_Conectar.setEnabled(false);
                 jTextField_Nick.setEnabled(false);
@@ -322,27 +331,28 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, e.getMessage());
         }
     }//GEN-LAST:event_jButton_ConectarActionPerformed
-   
+
     /**
-     * método privado que captura a mensagem escrita na caixa de texto mais o apelido da caixa de texto nick
-     * monta a mensagem e a envia ao grupo
+     * método privado que captura a mensagem escrita na caixa de texto mais o
+     * apelido da caixa de texto nick monta a mensagem e a envia ao grupo
+     *
      * @throws IOException
      * @throws NumberFormatException
-     * @throws NullPointerException 
+     * @throws NullPointerException
      */
     private void enviarMsg() throws IOException, NumberFormatException, NullPointerException {
         try {
             String msg = jTextField_Nick.getText() + ": " + jTextField_textoDeEnvio.getText();
-            
+
             // Verifica se há um destinatário selecionado na lista
             String destinatarioSelecionado = jList1.getSelectedValue();
             if (destinatarioSelecionado != null && !destinatarioSelecionado.equals("Todos")) {
-            // Extraímos o IP do destinatário, que vem no formato: Nome (IP)
-            String ipDestinatarioString = destinatarioSelecionado.replaceAll(".*\\((.*)\\).*", "$1");  // Regex para pegar o IP entre parênteses
-            
-            InetAddress ipDestinatario = InetAddress.getByName(ipDestinatarioString);  // Converte o IP extraído para InetAddress
-            DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, ipDestinatario.getHostAddress(), Integer.parseInt(jTextField_Porta.getText()));
-            socket.send(pacote);  // Envia a mensagem para o destinatário específico
+                // Extraímos o IP do destinatário, que vem no formato: Nome (IP)
+                String ipDestinatarioString = destinatarioSelecionado.replaceAll(".*\\((.*)\\).*", "$1");  // Regex para pegar o IP entre parênteses
+
+                InetAddress ipDestinatario = InetAddress.getByName(ipDestinatarioString);  // Converte o IP extraído para InetAddress
+                DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, ipDestinatario.getHostAddress(), Integer.parseInt(jTextField_Porta.getText()));
+                socket.send(pacote);  // Envia a mensagem para o destinatário específico
             } else {
                 // Caso o destinatário seja "Todos", envia para o grupo
                 DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
@@ -359,7 +369,7 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
                 DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
                 socket.send(pacote);
             }
-            */
+             */
             jTextField_textoDeEnvio.setText("");
         } catch (IOException | NumberFormatException | NullPointerException e) {
             if (e.getClass().toString().equals("class java.lang.NullPointerException")) {
@@ -371,7 +381,9 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
     }
 
     /**
-     * método privado que trata o envio de mensagens escritas na caixa de texto de mensagens 
+     * método privado que trata o envio de mensagens escritas na caixa de texto
+     * de mensagens
+     *
      * @param evt contém o evento recebido pelo tratador
      */
     private void jButton_EnviarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton_EnviarActionPerformed
@@ -384,7 +396,9 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton_EnviarActionPerformed
 
     /**
-     * método privado que trata o evento do botão sair, ou seja, finaliza o sistema
+     * método privado que trata o evento do botão sair, ou seja, finaliza o
+     * sistema
+     *
      * @param evt contém o evento recebido pelo tratador
      */
     private void jButton_SairActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton_SairActionPerformed
@@ -396,7 +410,9 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton_SairActionPerformed
 
     /**
-     * método privado que trata o pressionamento das teclas Enter ou Esc quando o foco estiver na caixa de envio de texto
+     * método privado que trata o pressionamento das teclas Enter ou Esc quando
+     * o foco estiver na caixa de envio de texto
+     *
      * @param evt contém o evento recebido pelo tratador
      */
     private void jTextField_textoDeEnvioKeyPressed(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextField_textoDeEnvioKeyPressed
@@ -456,7 +472,7 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
     InetAddress grupo;
     MulticastSocket socket;
     LinkedList<String> lista = new LinkedList<>();
-    
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton_Conectar;
     private javax.swing.JButton jButton_Enviar;
