@@ -190,23 +190,17 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
                     //endereço dos Remetentes
                     InetAddress senderAddress = (pacote.getAddress());
                     String nomeUsuario = msgRecebida.split(" ")[0];  // Pega a primeira palavra antes do "entrou"
-                    
-                    
-                    if (msgRecebida.contains("saiu da sala")) {
-                    // Remove o usuário do HashMap
-                        if (usuarios.containsKey(nomeUsuario)) {
-                            usuarios.remove(nomeUsuario);  // Remove o usuário do HashMap
+                    if (nomeUsuario.contains(":"));nomeUsuario = nomeUsuario.replace(":", "");
+                    if (msgRecebida.endsWith("saiu da sala")) {
+                        removeJlist(nomeUsuario);
                         }
-                    } else {
-                        // Caso não seja uma mensagem de saída, adiciona ou atualiza o usuário no HashMap
-                        if (!usuarios.containsKey(nomeUsuario)){
-                            usuarios.put(nomeUsuario, senderAddress);
-                        }
+                    
+                    // Adiciona o usuário ao HashMap se ele ainda não estiver lá
+                    if (!usuarios.containsKey(nomeUsuario)) {
+                        usuarios.put(nomeUsuario, senderAddress);
+                        updateJList();  // Atualiza a lista de usuários na interface
                     }
                     
-
-                    // Atualiza a JList de usuários
-                    updateJList();
                     
                     lista.add(msgRecebida);
                     Iterator i = lista.iterator();
@@ -240,8 +234,25 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
         jList1.setModel(model);
     }
     
+    private void removeJlist(String nomeUsuario){
+        DefaultListModel<String> model = (DefaultListModel<String>) jList1.getModel();
     
-    
+    // Remove o usuário do HashMap
+    if (usuarios.containsKey(nomeUsuario)) {
+        usuarios.remove(nomeUsuario);  // Remove o usuário do HashMap
+    }
+
+    // Remove o usuário da JList
+    for (int i = 0; i < model.getSize(); i++) {
+        if (model.getElementAt(i).startsWith(nomeUsuario)) {
+            model.removeElementAt(i);  // Remove o item da JList que contém o nome do usuário
+            break;  // Não é necessário continuar buscando após encontrar o usuário
+        }
+    }
+
+    // Atualiza a JList
+    jList1.setModel(model);
+}
 
     /**
      * método privado que avisa que um computador saiu do grupo e encerra a conexão
@@ -251,18 +262,13 @@ public class JFrame_chatMulticast extends javax.swing.JFrame {
      */
     private void sairDoSistema() throws IOException, NumberFormatException, NullPointerException {
         try {
+
             String nomeUsuario = jTextField_Nick.getText();
             String msg = nomeUsuario + " saiu da sala";
-            DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText()));
+            DatagramPacket pacote = ComunicadorUDP.montaMensagem(msg, jTextField_GrupoIP.getText(), Integer.parseInt(jTextField_Porta.getText())); 
             socket.send(pacote);
             
-            // Remove o usuário do HashMap usando o nome do usuário como chave
-            if (usuarios.containsKey(nomeUsuario)) {
-                usuarios.remove(nomeUsuario);  // Remove o usuário do HashMap
-            }
 
-            // Atualiza a JList com os usuários restantes
-            updateJList();
 
         } catch (IOException | NumberFormatException | NullPointerException e) {
             if (e.getClass().toString().equals("class java.lang.NullPointerException")) {
