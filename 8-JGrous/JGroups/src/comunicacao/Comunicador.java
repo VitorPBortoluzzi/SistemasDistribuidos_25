@@ -24,12 +24,14 @@ public class Comunicador extends ReceiverAdapter {
     List<Address> listaAnterior = null;
 
     // 3 Historico Msg
-    StringBuffer historicoMensagens = new StringBuffer();
+    // StringBuffer historicoMensagens = new StringBuffer();
+    StringBuffer historicoMensagensPublicas = new StringBuffer();
+    StringBuffer historicoMensagensPrivadas = new StringBuffer();
 
     public void iniciar(JFrame_chatJGROUPS meuFrame) throws Exception {
 
         System.setProperty("java.net.preferIPv4Stack", "true");//desabilita ipv6, para que só sejam aceitas conexões via ipv4
-        //System.setProperty("jgroups.bind_addr", "127.0.0.1");
+        System.setProperty("jgroups.bind_addr", "127.0.0.1");
         /*
          * JGroups utiliza um JChannel como principal forma de conectar
          * a um cluster/grupo. É atraves dele que enviaremos e recebermos mensagens
@@ -59,32 +61,35 @@ public class Comunicador extends ReceiverAdapter {
         this.meuFrame.getjTextArea_listaMembros().setText(membrosStringBuffer.toString());
     }
 
-    public void enviar(String frase, String participante) {
-        try {
-            if (participante == null) {
-                /*
-                 * cria uma instancia da classe Message do JGrupos com a mensagem.
-                 * O primeiro parâmetro é o endereço do destinatário. Caso seja null, a mensagem é enviada para todos do grupo
-                 * O segundo parâmetro é a mensagem enviada através de um buffer de bytes (convertida automaticamente)
-                 */
-                this.mensagem = new Message(null, frase);
-            } else {
-                for (int i = 0; i < this.listaMembros.size(); i++) {
-                    if (participante.equals(listaMembros.get(i).toString())) {
-                        System.out.println("Achouuuu");
-                        this.mensagem = new Message(listaMembros.get(i), frase);
-                        break;
+public void enviar(String frase, String participante) {
+    try {
+        if (participante == null) {
+            // Mensagem pública
+            this.mensagem = new Message(null, frase);
+            this.channel.send(this.mensagem);
+        } else {
+            // Mensagem privada
+            for (Address addr : this.listaMembros) {
+                if (participante.equals(addr.toString())) {
+                    this.mensagem = new Message(addr, frase);
+                    this.channel.send(this.mensagem);
+
+                    // Exibir localmente também
+                    String linha = "[Privado para " + participante + "] Você disse: " + frase + "\n";
+                    this.meuFrame.getjTextArea_mensagensGerais().append(linha);
+
+                    // Armazena no histórico de privadas do remetente
+                    synchronized (historicoMensagensPrivadas) {
+                        historicoMensagensPrivadas.append(linha);
                     }
+                    break;
                 }
             }
-            /*
-            * envia a mensagem montada acima ao grupo
-             */
-            this.channel.send(this.mensagem);
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(meuFrame, "Algo ocorreu de errrado ao enviar sua mensagem!!");
         }
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(meuFrame, "Algo ocorreu de errado ao enviar sua mensagem!!");
     }
+}
 
     public void finalizar() {
         this.channel.close();
@@ -103,14 +108,28 @@ public class Comunicador extends ReceiverAdapter {
         String linha = "[" + dt.toString() + "] " + msg.getSrc() + " disse: "
                 + msg.getObject().toString() + "\n";
 
-        historicoMensagens.append(linha);
+        //historicoMensagens.append(linha);
+        if (msg.getDest() == null) {
+            // Mensagem pública
+            historicoMensagensPublicas.append(linha);
+        } else {
+            // Mensagem privada
+            historicoMensagensPrivadas.append(linha);
+        }
         this.meuFrame.getjTextArea_mensagensGerais().append(linha);
     }
 
-    @Override
+    /*@Override
     public void getState(java.io.OutputStream output) throws Exception {
         synchronized (historicoMensagens) {
             output.write(historicoMensagens.toString().getBytes());
+        }
+    }
+     */
+    @Override
+    public void getState(java.io.OutputStream output) throws Exception {
+        synchronized (historicoMensagensPublicas) {
+            output.write(historicoMensagensPublicas.toString().getBytes());
         }
     }
 
@@ -118,7 +137,11 @@ public class Comunicador extends ReceiverAdapter {
     public void setState(java.io.InputStream input) throws Exception {
         byte[] buf = input.readAllBytes();
         String estado = new String(buf);
-        this.historicoMensagens = new StringBuffer(estado);
+
+        synchronized (historicoMensagensPublicas) {
+            historicoMensagensPublicas = new StringBuffer(estado);
+        }
+
         this.meuFrame.getjTextArea_mensagensGerais().setText(estado);
     }
 
@@ -178,25 +201,28 @@ public class Comunicador extends ReceiverAdapter {
         this.meuFrame.getjComboBox_listaParticipantesGrupo().removeAllItems();
         this.meuFrame.getjComboBox_listaParticipantesGrupo().addItem("Selecione o participante");
 
-        for (Address addr : novaLista) {
+        for (Address addr : listaMembros) {
+            String nome = addr.toString();
             String ip = "n/a";
+
             try {
-                /*
-                ip = addr instanceof org.jgroups.stack.IpAddress
-                        ? ((org.jgroups.stack.IpAddress) addr).getIpAddress().getHostAddress()
-                        : "n/a";
-                */// Mesmo que
-                if (addr instanceof org.jgroups.stack.IpAddress) {
-    ip = ((org.jgroups.stack.IpAddress) addr).getIpAddress().getHostAddress();
-} else {
-    ip = "n/a";
-}
-                
+                // Tenta pegar o endereço físico associado ao endereço lógico
+                Address physicalAddr = (Address) channel.down(
+                        new org.jgroups.Event(org.jgroups.Event.GET_PHYSICAL_ADDRESS, addr)
+                );
+
+                if (physicalAddr instanceof org.jgroups.stack.IpAddress) {
+                    org.jgroups.stack.IpAddress ipAddr = (org.jgroups.stack.IpAddress) physicalAddr;
+                    String host = ipAddr.getIpAddress().getHostAddress();
+                    int port = ipAddr.getPort();
+                    ip = host + ":" + port; // exibe IP + porta
+                }
             } catch (Exception e) {
+                e.printStackTrace();
             }
 
-            membrosStringBuffer.append(addr.toString() + " (" + ip + ")\n");
-            this.meuFrame.getjComboBox_listaParticipantesGrupo().addItem(addr.toString());
+            membrosStringBuffer.append(nome + " (" + ip + ")\n");
+            this.meuFrame.getjComboBox_listaParticipantesGrupo().addItem(nome);
         }
 
         this.meuFrame.getjTextArea_listaMembros().setText(membrosStringBuffer.toString());
