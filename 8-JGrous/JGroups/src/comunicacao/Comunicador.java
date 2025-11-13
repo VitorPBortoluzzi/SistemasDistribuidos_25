@@ -29,7 +29,7 @@ public class Comunicador extends ReceiverAdapter {
     public void iniciar(JFrame_chatJGROUPS meuFrame) throws Exception {
 
         System.setProperty("java.net.preferIPv4Stack", "true");//desabilita ipv6, para que só sejam aceitas conexões via ipv4
-        System.setProperty("jgroups.bind_addr", "127.0.0.1");
+        //System.setProperty("jgroups.bind_addr", "127.0.0.1");
         /*
          * JGroups utiliza um JChannel como principal forma de conectar
          * a um cluster/grupo. É atraves dele que enviaremos e recebermos mensagens
@@ -138,7 +138,7 @@ public class Comunicador extends ReceiverAdapter {
     public void viewAccepted(View view_atual) {
         List<Address> novaLista = view_atual.getMembers();
 
-        // 🔹 Detectar entradas/saídas
+        // Detectar entradas/saídas
         if (listaAnterior != null) {
             for (Address antigo : listaAnterior) {
                 if (!novaLista.contains(antigo)) {
@@ -154,7 +154,6 @@ public class Comunicador extends ReceiverAdapter {
             }
         }
 
-        // Atualizar lista de membros (como no desafio 1)
         /**
          * Percorre a lista de membros conectados ao grupo JGroups e extrai
          * informações de cada um (nome e endereço IP). Essas informações são:
@@ -182,9 +181,17 @@ public class Comunicador extends ReceiverAdapter {
         for (Address addr : novaLista) {
             String ip = "n/a";
             try {
+                /*
                 ip = addr instanceof org.jgroups.stack.IpAddress
                         ? ((org.jgroups.stack.IpAddress) addr).getIpAddress().getHostAddress()
                         : "n/a";
+                */// Mesmo que
+                if (addr instanceof org.jgroups.stack.IpAddress) {
+    ip = ((org.jgroups.stack.IpAddress) addr).getIpAddress().getHostAddress();
+} else {
+    ip = "n/a";
+}
+                
             } catch (Exception e) {
             }
 
